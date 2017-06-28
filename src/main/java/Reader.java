@@ -1,4 +1,6 @@
 import org.apache.commons.lang3.StringUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -8,7 +10,6 @@ import java.net.URL;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.text.ParseException;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -27,6 +28,8 @@ public class Reader {
 	private List<LocalDate> dates;
 	private List<String> fundNames;
 	private List<List<Double>> prices;
+	
+	private static final Logger log = LoggerFactory.getLogger(Reader.class);
 	
 	public Reader() {
 		dates = new ArrayList<>();
@@ -99,12 +102,12 @@ public class Reader {
 				reader.readLine();
 			}
 		} catch (IOException | NumberFormatException exception) {
-			exception.printStackTrace();
+			log.error(null, exception);
 		}
 	}
 	
 	private void write() {
-		Path writePath = FileSystems.getDefault().getPath(WRITE_DIRECTORY, LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd")));
+		Path writePath = FileSystems.getDefault().getPath(WRITE_DIRECTORY, LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"))).toAbsolutePath();
 		
 		List<String> fileContents = new ArrayList<>();
 		fileContents.add("Fund name" + SEPARATOR + StringUtils.join(dates.stream().map(date -> date.format(outgoingDateFormat)).collect(Collectors.toList()), SEPARATOR));
@@ -113,16 +116,18 @@ public class Reader {
 		}
 		
 		try {
-			System.out.println("Writing to " + writePath);
+			log.debug("Writing to " + writePath);
 			Files.write(writePath, fileContents);
-		} catch (IOException e) {
-			e.printStackTrace();
+		} catch (IOException exception) {
+			log.error(null, exception);
 		}
 	}
 	
 	public static void main(String[] args) {
 		Reader reader = new Reader();
+		log.info("Reading...");
 		reader.read();
+		log.info("Writing...");
 		reader.write();
 	}
 }
