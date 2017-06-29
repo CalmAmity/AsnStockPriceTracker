@@ -86,12 +86,22 @@ public class Reader {
 				List<Double> pricesForFund = new ArrayList<>();
 				
 				// Read all three prices.
-				for (int price = 0; price < 3; price++) {
+				for (int dateIndex = 0; dateIndex < 3; dateIndex++) {
 					// Skip two lines.
 					reader.readLine();
 					reader.readLine();
-					currentLine = StringUtils.strip(reader.readLine());
-					pricesForFund.add(Double.parseDouble(currentLine.replace(',', '.')));
+					currentLine = StringUtils.strip(reader.readLine()).replace(',', '.');
+					Double price;
+					try {
+						// Read the stock price on this line. It uses the Dutch number format (',' as decimal separator), so correct for that.
+						price = Double.parseDouble(currentLine);
+					} catch (NumberFormatException exception) {
+						// For some reason the price could not be read. Register a null value and log a warning.
+						price = null;
+						log.warn("Error reading price for fund '{}' on {}: '{}' is not a number.", fundName, dates.get(dateIndex).format(outgoingDateFormat), currentLine);
+					}
+					
+					pricesForFund.add(price);
 				}
 				
 				fundNames.add(fundName);
@@ -101,8 +111,8 @@ public class Reader {
 				reader.readLine();
 				reader.readLine();
 			}
-		} catch (IOException | NumberFormatException exception) {
-			log.error(null, exception);
+		} catch (IOException exception) {
+			log.error("Exception occurred while reading page:", exception);
 		}
 	}
 	
@@ -119,7 +129,7 @@ public class Reader {
 			log.debug("Writing to " + writePath);
 			Files.write(writePath, fileContents);
 		} catch (IOException exception) {
-			log.error(null, exception);
+			log.error("Exception occurred while writing file:", exception);
 		}
 	}
 	
