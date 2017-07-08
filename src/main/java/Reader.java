@@ -15,12 +15,15 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 public class Reader {
 	/** The URL for the page containing the stock prices. */
 	private static final String LIST_PAGE_URL = "https://www.asnbank.nl/particulier/beleggen/koersen.html";
-	private static final String TABLE_HEADER_PREFIX = "<th> Koers (laatste 3 beschikbare)";
+	private static final String TABLE_HEADER_CONTENT = "Koers (laatste 3 beschikbare)";
+	private static final Pattern LIST_PAGE_FUND_NAME_PATTERN = Pattern.compile("title=\"([\\w\\s&;-]+)\"");
 	
 	private static final String[] FUND_PAGE_URLS = new String[]{
 		"https://www.asnbank.nl/beleggen/beleggingsrekening/beleggingsfondsen/asn-duurzaam-aandelenfonds.html"
@@ -43,8 +46,12 @@ public class Reader {
 	private static final String SEPARATOR = ";";
 	private static final String EXTENSION = ".csv";
 	
-	private static final DateTimeFormatter incomingDateFormat = DateTimeFormatter.ofPattern("dd-MM-yyyy");
-	private static final DateTimeFormatter outgoingDateFormat = DateTimeFormatter.ofPattern("yyyyMMdd");
+	private static final Pattern INCOMING_DATE_PATTERN = Pattern.compile("\\d\\d-\\d\\d-\\d\\d\\d\\d");
+	private static final DateTimeFormatter INCOMING_DATE_FORMAT = DateTimeFormatter.ofPattern("dd-MM-yyyy");
+	private static final DateTimeFormatter OUTGOING_DATE_FORMAT = DateTimeFormatter.ofPattern("yyyyMMdd");
+	
+	private static final Pattern INCOMING_PRICE_PATTERN = Pattern.compile("[\\d]+,[\\d]+");
+	
 	private List<LocalDate> dates;
 	private List<String> fundNames;
 	private List<List<Double>> prices;
@@ -74,7 +81,7 @@ public class Reader {
 			log.trace("Finding table header...");
 			do {
 				currentLine = StringUtils.strip(reader.readLine());
-			} while (currentLine != null && !StringUtils.startsWith(currentLine, TABLE_HEADER_PREFIX));
+			} while (currentLine != null && !StringUtils.contains(currentLine, TABLE_HEADER_CONTENT));
 			
 			if (currentLine == null) {
 				log.error("Finding table header failed.");
@@ -86,54 +93,58 @@ public class Reader {
 			for (int line = 0; line < 3; line++) {
 				// Strip the HTML tags from the line and parse the date from the remaining string.
 				currentLine = StringUtils.strip(reader.readLine());
-				LocalDate date = LocalDate.parse(StringUtils.substringBetween(currentLine, "<th>", "</th>"), incomingDateFormat);
+				Matcher matcher = INCOMING_DATE_PATTERN.matcher(currentLine);
+				if (!matcher.find()) {
+					log.error("No price found in line '{}'. Stopping.", currentLine);
+					return;
+				}
+				
+				LocalDate date = LocalDate.parse(matcher.group(), INCOMING_DATE_FORMAT);
 				dates.add(date);
 			}
 			
 			// Skip three lines.
-			for (int line = 0; line < 3; line++) {
-				reader.readLine();
-			}
+			reader.readLine();
+			reader.readLine();
+			reader.readLine();
 			
 			// Handle all twelve funds.
 			while (true) {
-				// Skip two lines.
+				// Skip one line (the <tr>).
 				reader.readLine();
-				reader.readLine();
+				
 				currentLine = StringUtils.strip(reader.readLine());
-				
-				// currentLine now has the form of a basic <a/> tag.
-				String fundName = StringUtils.removeEnd(
-						// Find the fund name after the end of the opening <a> tag...
-						StringUtils.substringAfter(currentLine, ".html\">"),
-						// ...and remove the closing <a> tag, if present.
-						"</a>")
-						// Finally, replace the ampersand with a plus sign to prevent inopportune Unicode escaping.
-						.replace(" &amp;", " +");;
-				
-				if (StringUtils.isBlank(fundName)) {
-					// No further funds are present on the page.
-					break;
+				// currentLine now has the form of a basic <a/> tag within a <td/> tag. The fund name is both the link text, and the 'title' attribute of the <a/> tag. Use a reular
+				// expression to read this last instance of the fund name.
+				Matcher matcher = LIST_PAGE_FUND_NAME_PATTERN.matcher(currentLine);
+				if (!matcher.find()) {
+					log.info("No fund name found in line '{}'. Stopping after {} funds successfully read.", currentLine, fundNames.size());
+					return;
 				}
 				
-				log.trace("Reading prices for {}.", fundName);
-				
-				List<Double> pricesForFund = new ArrayList<>();
+				String fundName = matcher.group(1);
+				// Replace the ampersand with a plus sign to prevent inopportune Unicode escaping.
+				fundName = fundName.replace(" &amp;", " +");
 				
 				// Read all three prices.
+				log.trace("Reading prices for {}.", fundName);
+				List<Double> pricesForFund = new ArrayList<>();
 				for (int dateIndex = 0; dateIndex < 3; dateIndex++) {
-					// Skip two lines.
-					reader.readLine();
-					reader.readLine();
-					currentLine = StringUtils.strip(reader.readLine()).replace(',', '.');
+					currentLine = StringUtils.strip(reader.readLine());
+					matcher = INCOMING_PRICE_PATTERN.matcher(currentLine);
+					if (!matcher.find()) {
+						log.error("No price found in line '{}'. Stopping.", currentLine);
+						return;
+					}
+					
 					Double price;
 					try {
 						// Read the stock price on this line. It uses the Dutch number format (',' as decimal separator), so correct for that.
-						price = Double.parseDouble(currentLine);
+						price = Double.parseDouble(matcher.group().replace(',', '.'));
 					} catch (NumberFormatException exception) {
 						// For some reason the price could not be read. Register a null value and log a warning.
 						price = null;
-						log.warn("Error reading price for fund '{}' on {}: '{}' is not a number.", fundName, dates.get(dateIndex).format(outgoingDateFormat), currentLine);
+						log.warn("Error reading price for fund '{}' on {}: no number found in line '{}'.", fundName, dates.get(dateIndex).format(OUTGOING_DATE_FORMAT), currentLine);
 					}
 					
 					pricesForFund.add(price);
@@ -142,8 +153,7 @@ public class Reader {
 				fundNames.add(fundName);
 				prices.add(pricesForFund);
 				
-				// Skip two lines.
-				reader.readLine();
+				// Skip one line (the </tr>).
 				reader.readLine();
 			}
 		} catch (IOException exception) {
@@ -190,7 +200,7 @@ public class Reader {
 				String[] currentLineSplit = currentLine.split(" ");
 				String dateString = currentLineSplit[1];
 				log.trace("Reading date from string '{}'.", dateString);
-				LocalDate date = LocalDate.parse(dateString, incomingDateFormat);
+				LocalDate date = LocalDate.parse(dateString, INCOMING_DATE_FORMAT);
 				String priceString = StringUtils.substringBefore(currentLineSplit[3], "</h2>");
 				log.trace("Reading price from string '{}'.", priceString);
 				Double price;
@@ -200,7 +210,7 @@ public class Reader {
 				} catch (NumberFormatException exception) {
 					// For some reason the price could not be read. Register a null value and log a warning.
 					price = null;
-					log.warn("Error reading price for fund '{}' on {}: '{}' is not a number.", fundName, date.format(outgoingDateFormat), priceString);
+					log.warn("Error reading price for fund '{}' on {}: '{}' is not a number.", fundName, date.format(OUTGOING_DATE_FORMAT), priceString);
 				}
 				
 				if (dates.isEmpty()) {
@@ -219,7 +229,7 @@ public class Reader {
 		Path writePath = FileSystems.getDefault().getPath(WRITE_DIRECTORY, LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd")) + EXTENSION).toAbsolutePath();
 		
 		List<String> fileContents = new ArrayList<>();
-		fileContents.add("Fund name" + SEPARATOR + StringUtils.join(dates.stream().map(date -> date.format(outgoingDateFormat)).collect(Collectors.toList()), SEPARATOR));
+		fileContents.add("Fund name" + SEPARATOR + StringUtils.join(dates.stream().map(date -> date.format(OUTGOING_DATE_FORMAT)).collect(Collectors.toList()), SEPARATOR));
 		for (int fundIndex = 0; fundIndex < fundNames.size(); fundIndex++) {
 			fileContents.add(fundNames.get(fundIndex) + SEPARATOR + StringUtils.join(prices.get(fundIndex), SEPARATOR));
 		}
