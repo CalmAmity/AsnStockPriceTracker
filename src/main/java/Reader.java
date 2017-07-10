@@ -133,18 +133,20 @@ public class Reader {
 					currentLine = StringUtils.strip(reader.readLine());
 					matcher = INCOMING_PRICE_PATTERN.matcher(currentLine);
 					if (!matcher.find()) {
-						log.error("No price found in line '{}'. Stopping.", currentLine);
-						return;
+						log.warn("No price found in line '{}'. Skipping.", currentLine);
+						continue;
 					}
 					
+					String priceString = matcher.group();
 					Double price;
 					try {
 						// Read the stock price on this line. It uses the Dutch number format (',' as decimal separator), so correct for that.
-						price = Double.parseDouble(matcher.group().replace(',', '.'));
+						price = Double.parseDouble(priceString.replace(',', '.'));
 					} catch (NumberFormatException exception) {
 						// For some reason the price could not be read. Register a null value and log a warning.
 						price = null;
-						log.warn("Error reading price for fund '{}' on {}: no number found in line '{}'.", fundName, dates.get(dateIndex).format(OUTGOING_DATE_FORMAT), currentLine);
+						log.error("Error reading price for fund '{}' on {}: '{}' is not a number.", fundName, dates.get(dateIndex).format(OUTGOING_DATE_FORMAT), priceString);
+						return;
 					}
 					
 					pricesForFund.add(price);
