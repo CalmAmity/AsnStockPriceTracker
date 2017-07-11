@@ -134,6 +134,7 @@ public class Reader {
 					matcher = INCOMING_PRICE_PATTERN.matcher(currentLine);
 					if (!matcher.find()) {
 						log.warn("No price found in line '{}'. Skipping.", currentLine);
+						pricesForFund.add(null);
 						continue;
 					}
 					
