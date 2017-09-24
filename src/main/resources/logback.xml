@@ -7,7 +7,7 @@
         </encoder>
     </appender>
     <appender name="FILE" class="ch.qos.logback.core.FileAppender">
-        <file>D:/Programming/Projects/AsnStockPriceTracker/output/AsnStockPriceTracker.log</file>
+        <file>D:/Programming/Projects/AsnStockPriceTracker/log/AsnStockPriceTracker.log</file>
         <encoder>
             <pattern>
                 %d{HH:mm:ss.SSS} [%thread] %-5level %logger{36}.%M - %msg%n

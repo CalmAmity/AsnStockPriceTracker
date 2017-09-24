@@ -46,7 +46,7 @@
 					</descriptorRefs>
 					<archive>
 						<manifest>
-							<mainClass>Reader</mainClass>
+							<mainClass>Collector</mainClass>
 						</manifest>
 					</archive>
 				</configuration>

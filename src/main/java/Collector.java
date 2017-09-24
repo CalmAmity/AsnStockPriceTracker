@@ -19,7 +19,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
-public class Reader {
+public class Collector {
 	/** The URL for the page containing the stock prices. */
 	private static final String LIST_PAGE_URL = "https://www.asnbank.nl/particulier/beleggen/koersen.html";
 	private static final String TABLE_HEADER_CONTENT = "Koers (laatste 3 beschikbare)";
@@ -48,7 +48,7 @@ public class Reader {
 	
 	private static final Pattern INCOMING_DATE_PATTERN = Pattern.compile("\\d\\d-\\d\\d-\\d\\d\\d\\d");
 	private static final DateTimeFormatter INCOMING_DATE_FORMAT = DateTimeFormatter.ofPattern("dd-MM-yyyy");
-	private static final DateTimeFormatter OUTGOING_DATE_FORMAT = DateTimeFormatter.ofPattern("yyyyMMdd");
+	public static final DateTimeFormatter OUTGOING_DATE_FORMAT = DateTimeFormatter.ofPattern("yyyyMMdd");
 	
 	private static final Pattern INCOMING_PRICE_PATTERN = Pattern.compile("[\\d]+,[\\d]+");
 	
@@ -56,9 +56,9 @@ public class Reader {
 	private List<String> fundNames;
 	private List<List<Double>> prices;
 	
-	private static final Logger log = LoggerFactory.getLogger(Reader.class);
+	private static final Logger log = LoggerFactory.getLogger(Collector.class);
 	
-	public Reader() {
+	public Collector() {
 		dates = new ArrayList<>();
 		fundNames = new ArrayList<>();
 		prices = new ArrayList<>();
@@ -246,15 +246,15 @@ public class Reader {
 	}
 	
 	public static void main(String[] args) {
-		Reader reader = new Reader();
+		Collector collector = new Collector();
 		log.info("Reading...");
-		reader.readListPage();
-		if (reader.prices.isEmpty()) {
-			// The reader failed to read the prices from the list page. Try the alternative: read prices from the individual fund pages.
-			reader.readFundPages();
+		collector.readListPage();
+		if (collector.prices.isEmpty()) {
+			// The collector failed to read the prices from the list page. Try the alternative: read prices from the individual fund pages.
+			collector.readFundPages();
 		}
 		log.info("Reading complete. Writing...");
-		reader.write();
+		collector.write();
 		log.info("Writing complete");
 	}
 }
