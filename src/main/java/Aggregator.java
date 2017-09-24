@@ -17,7 +17,7 @@ import java.util.stream.Stream;
 public class Aggregator {
 	public static final String READ_DIRECTORY = "D:/Programming/Projects/AsnStockPriceTracker/output";
 	public static final String WRITE_DIRECTORY = "D:/Programming/Projects/AsnStockPriceTracker/aggregated";
-	private static final String SEPARATOR = ";";
+	public static final String SEPARATOR = ";";
 	private static final String EXTENSION = ".csv";
 	
 	private static final Logger log = LoggerFactory.getLogger(Aggregator.class);
@@ -27,8 +27,8 @@ public class Aggregator {
 	private void aggregate() throws IOException {
 		values = new HashMap<>();
 		
-		Path writePath = FileSystems.getDefault().getPath(READ_DIRECTORY).toAbsolutePath();
-		Stream<Path> files = Files.list(writePath);
+		Path readPath = FileSystems.getDefault().getPath(READ_DIRECTORY).toAbsolutePath();
+		Stream<Path> files = Files.list(readPath);
 		files.forEach((path -> {
 			try {
 				this.readFile(path);
