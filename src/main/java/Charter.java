@@ -17,7 +17,7 @@ import java.util.List;
 import java.util.Objects;
 
 public class Charter extends ApplicationFrame {
-	public static final String READ_FILE = "D:/Programming/Projects/AsnStockPriceTracker/aggregated/20170924.csv";
+	public static final String READ_FILE = "D:/Programming/Projects/AsnStockPriceTracker/aggregated/20180407.csv";
 	
 	public static final Integer FUND_INDEX = 8;
 	
